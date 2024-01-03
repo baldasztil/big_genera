@@ -57,3 +57,6 @@ data/*
 *.xlsx
 *.xml
 
+#Proj files 
+*.Rproj
+

@@ -3,6 +3,7 @@ library(sf)
 library(rWCVP)
 library(tmap)
 library(tmaptools)
+library(cowplot)
 
 
 plotting.maps <- function (x) {
@@ -90,26 +91,34 @@ plants_full <- inner_join(wcvp_accepted, dist_patterns, by = "plant_name_id")
 
 # baseline richness ------------------------------------------------------------
 # calculating overall richness patterns 
+# calculating overall richness patterns 
 plants_megadiverse <- plants_full %>% 
   filter(genus %in% mega_genera$megadiverse)
 
+# score megadiverse genera 
 dist_megadiverse <- dist_native %>% 
   filter(plant_name_id %in% plants_megadiverse$plant_name_id) %>%  
   mutate(mega = "yes",
          presence = 1)
 
+# score non-megadiverse genera
 dist_normal <- dist_native %>% 
   filter(!plant_name_id %in% dist_megadiverse$plant_name_id) %>%  
   mutate(mega = "no", 
-         presence = 0)
+         presence = -1)
 
-dist_full <- rbind(dist_megadiverse, dist_normal)
+# combine dataset
+dist_full <- rbind(dist_megadiverse, dist_normal) %>%
+  left_join(wcvp_accepted, by = "plant_name_id")
 
+
+# calculate richness patterns 
 richness_patterns_bru <- dist_full %>% 
   group_by(area_code_l3) %>% 
   summarise(
     total_sp = n_distinct(plant_name_id),
-    megadiverse_sp = sum(presence),
+    megadiverse_sp = sum(presence > 0),
+    non_megadiverse_sp = sum(presence < 0),
     prop_megadiverse = megadiverse_sp / total_sp
   ) %>%
   arrange(desc(total_sp)) %>% 
@@ -173,6 +182,23 @@ prop_megadiverse_richness_map <- tm_shape(richness_mapping) +
   ) 
 
 tmap_save(prop_megadiverse_richness_map, "proportion_map.svg")
+
+non_megadiverse_richness_map <- tm_shape(richness_mapping) + 
+  tm_fill(col = "non_megadiverse_sp", 
+          palette="Purples", 
+          n = 5) +
+  tm_legend(outside=TRUE) +
+  tm_borders(col = "black", 
+             lwd = 0.5, 
+             lty = "solid",
+             alpha = 0.3) +
+  tm_layout(main.title  = "Species in non-megadiverse genera",
+            fontfamily = "serif", 
+            main.title.size = 1.2, 
+            main.title.position = c("left", "top")
+  ) 
+
+tmap_save(non_megadiverse_richness_map, "non_megadiverse_map.svg")
 
 
 names <- mega_genera$megadiverse

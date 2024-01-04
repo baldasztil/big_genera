@@ -54,8 +54,8 @@ wcvp_accepted <- wcvp_raw %>%
   filter(taxon_status %in% c("Accepted")) %>% 
   filter(taxon_rank %in% c("Species")) %>% 
   filter(species_hybrid == "") %>% 
-  filter(genus_hybrid =="") 
-  #filter(!genus %in% c("Hieracium", "Taraxacum"))
+  filter(genus_hybrid =="") #%>% 
+  #filter(!genus %in% c("Hieracium", "Taraxacum", "Rubus", "Alchemilla"))
 
 # filter distrbutions 
 dist_native <- dist_raw %>% 
@@ -137,7 +137,7 @@ c <- ggplot(richness_mapping, aes(x = prop_megadiverse, y = lat)) +
   geom_point(color = "darkblue", alpha = 0.3) +
   geom_smooth(orientation = "y", col = "black", se = T, alpha = 0.15) +
   labs(x = "Proportion of species in megadiverse genera", y = "Latitude") +
-  theme_bw() 
+  theme_bw()
 
 # correlation between megadiversity and diversity with proportion as size
 d <- ggplot(richness_mapping, aes(x = megadiverse_sp, y = total_sp)) +
@@ -158,6 +158,12 @@ f <- e | d +  plot_layout(guides = "collect")
 
 ggsave(file = paste0("latidunal_patterns.svg"),f,   
        width = 12, height = 7)
+
+x <- ggplot(richness_mapping, aes(x = non_megadiverse_sp, y = lat)) +
+  geom_point(color = "purple", alpha = 0.3) +
+  geom_smooth(orientation = "y", col = "black", se = T, alpha = 0.15) +
+  labs(x = "Species in non-megadiverse genera", y = "Latitude") +
+  theme_bw()
 
 
 
@@ -249,33 +255,33 @@ continent_patterns <- as.data.frame(richness_mapping) %>%
   group_by(LEVEL1_NAM) %>% 
   summarise(
             mean_sp = mean(total_sp), 
-            sd_total = std.error(total_sp),
+            se_total = std.error(total_sp),
             
             mean_mega = mean(megadiverse_sp), 
-            sd_mega = std.error(megadiverse_sp),
+            se_mega = std.error(megadiverse_sp),
             
             mean_nonmega = mean(non_megadiverse_sp), 
-            sd_nonmega = std.error(non_megadiverse_sp),
+            se_nonmega = std.error(non_megadiverse_sp),
       
             mean_prop = mean(prop_megadiverse), 
-            sd_propmega = std.error(prop_megadiverse),
+            se_propmega = std.error(prop_megadiverse),
             
             count = n()
             )
 
 # reformatting the data 
 continent_patterns_long <- continent_patterns %>% 
-  pivot_longer(cols = c("mean_mega","mean_nonmega", "sd_mega", "sd_nonmega"), 
+  pivot_longer(cols = c("mean_mega","mean_nonmega", "se_mega", "se_nonmega"), 
                  names_to = c(".value", "megadiverse"),
                names_sep = "_") %>% 
-  dplyr::select(Continent = LEVEL1_NAM, group = megadiverse, Species = mean, sd)
+  dplyr::select(Continent = LEVEL1_NAM, group = megadiverse, Species = mean, se)
 
 
 # visualisation as barplot 
 barplot <- ggplot(continent_patterns_long, aes(fill=group, y= Continent, x= Species)) + 
   geom_bar(position="dodge", stat="identity", alpha = 0.9) +
   scale_fill_viridis(discrete = T, begin = 1, end = 0) +
-  geom_errorbar(aes(y = Continent, xmin= Species-sd, xmax= Species+sd), width=0.5, 
+  geom_errorbar(aes(y = Continent, xmin= Species-se, xmax= Species+se), width=0.5, 
                 colour="black", alpha=0.95, size=0.75, 
                 position = position_dodge(0.9)) +
   theme_bw() + 

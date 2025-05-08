@@ -27,64 +27,18 @@ replace.cluster <- function(x) {
 }
 
 
-tdwg_3 <- st_read(dsn ="data/wgsrpd-master/tdwg_3_realms_area/tdwg_3_realms_area.shp") %>% 
-  filter(!LEVEL3_COD == "BOU") %>% 
-  rename(climate_zone = kcl_zone, realm = PhyloRealm) %>% 
-  st_transform(crs = "+proj=eqearth")
+tdwg_3 <-  st_read(dsn ="data/tdwg_3_realms_area/")  %>% 
+  st_transform(crs = "+proj=eqearth") %>% 
+  dplyr::select(geometry, LEVEL3_COD)
+
+richness_patterns_bru <- fread("data/tdwg_overview_table_big_gen.csv")
+
+richness_mapping <- tdwg_3 %>% 
+  left_join(richness_patterns_bru, by = "LEVEL3_COD")
 
 
-dist_native <- fread("data/wcvp/dist_native.txt")  
-plants_full <- fread("data/wcvp/wcvp_accepted_merged.txt")
+genus_matrix <- fread("data/big_genera_porportions_matrix_pubready.csv")
 
-
-big_genera <- read.csv("data/twenty_years_big.csv")
-
-realms <- tdwg_3 %>% 
-  dplyr::select(LEVEL3_COD, realm) %>% 
-  as.data.frame()
-
-tdwg_codes <- read.table("data/tdwg_codes.csv", sep = ",", header = T) %>% 
-  dplyr::select(LEVEL3_COD, LEVEL1_NAM, LEVEL1_COD) %>% 
-  st_drop_geometry()
-
-tdwg_3_df <- tdwg_3 %>% 
-  st_drop_geometry() %>%  
-  as.data.frame()
-write.csv(tdwg_3_df, "tdwg_realm_kcl.csv")
-
-
-
-# manipulate data --------------------------------------------------------------
-
-
-# calculating overall richness patterns 
-plants_big <- plants_full %>% 
-  filter(genus %in% big_genera$Genus) 
-
-genus_info <- plants_big %>% 
-  dplyr::select(plant_name_id, genus)
-
-# score big genera 
-dist_big <- dist_native %>% 
-  filter(plant_name_id %in% plants_big$plant_name_id) %>% 
-  left_join(genus_info, by = "plant_name_id") %>% 
-  left_join(realms, by = c("area_code_l3" = "LEVEL3_COD")) 
-
-
-size_big <- plants_big %>% 
-  group_by(genus) %>% 
-  summarise(size =  n())
-
-genus_matrix <- dist_big %>% 
-  filter(!genus %in% c("Rubus", "Taraxacum", "Hieracium")) %>% 
-  group_by(genus, realm) %>% 
-  summarise(n = length(unique(plant_name_id))) %>% 
-  left_join(size_big, by = "genus") %>% 
-  mutate(prop = n / size) %>% 
-  dplyr::select(c(-n, -size)) %>% 
-  pivot_wider(values_from = prop, 
-              names_from = realm) %>% 
-  replace(is.na(.),0) 
 
 
 # dataformatting ---------------------------------------------------------------
@@ -189,7 +143,7 @@ df_pv <- t(df)
 
 res.pv <- pvclust(df_pv, method.hclust = "ward.D2",
                   method.dist="euclidian", 
-                  parallel = F, nboot = 10000)
+                  parallel = F, nboot = 100)
 
 print(res.pv)
 
@@ -330,46 +284,7 @@ unrooted_dend <- ggtree(phylo_tree, layout = "unrooted") %<+% tip_data +
   )
 
 
-dend_pca <- unrooted_dend + hierachcial_pca +  plot_annotation(tag_levels = "A") &
-  theme(plot.tag = element_text(face = 'bold'))
-
-
-
-
-### Maps   
-
-cluster_toadd <- final_data_boot %>% 
-  dplyr::select(genus, cluster)
-
-mapping_clusters <- dist_big %>% 
-  left_join(cluster_toadd, by = "genus") %>% 
-  group_by(area_code_l3, cluster) %>% 
-  summarise(diversity = length(unique(plant_name_id)) ) %>% 
-  group_by(cluster) %>% 
-  group_map(~ right_join(.x, tdwg_3, by = c("area_code_l3" = "LEVEL3_COD")), .keep = T) 
-
-
-mapping_clusters_ref <- lapply(mapping_clusters[1:5], replace.cluster) %>% 
-  rbindlist() %>% 
-  mutate(diversity = replace_na(diversity, 0)) %>% 
-  st_as_sf() %>% 
-  mutate(cluster = factor(cluster, levels = c(
-    "Tropical-Americas-centered",
-    "Holarctic-centered",
-    "Indo-Malesia-centered",
-    "Africa-centered", 
-    "Australia-centered"
-  )))
-
-
-(maps <- ggplot() +
-  geom_sf(data = mapping_clusters_ref, aes(fill = log10(diversity))) +
-  facet_wrap(~cluster, scales = "fixed", ncol = 1) +
-  theme_pubclean() +
-  theme(strip.background = element_rect(fill = "black", linewidth = 0.1), 
-        strip.text = element_text(colour = "white"), 
-        legend.key.height = unit(0.2, 'cm')) +
-  scale_fill_viridis(option = "A"))
-
+(dend_pca <- unrooted_dend + hierachcial_pca +  plot_annotation(tag_levels = "A") &
+  theme(plot.tag = element_text(face = 'bold')))
 
 

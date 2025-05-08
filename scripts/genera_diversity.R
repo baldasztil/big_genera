@@ -26,7 +26,7 @@ plotting.maps <- function (x) {
   map <- tm_shape(mapping_3) + 
     tm_fill(col = "total_sp", 
             palette="Greys", 
-            n = 5) +
+            n = 10) +
     tm_legend(outside=TRUE) +
     tm_borders(col = "black", 
                lwd = 0.5, 
@@ -202,7 +202,6 @@ tmap_save(non_megadiverse_richness_map, "non_megadiverse_map.svg")
 
 
 names <- mega_genera$megadiverse
-names <- c("Begonia", "Solanum")
 
 lapply(names, plotting.maps)
 # Analysis ---------------------------------------------------------------------

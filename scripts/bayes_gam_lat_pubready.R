@@ -15,80 +15,15 @@ library(patchwork)
 
 
 
-# import datasets
+# Data import ------------------------------------------------------------------
 
 
-tdwg_3 <- st_read(dsn ="data/wgsrpd-master/level3") %>%
-  # remove countries without species
-  filter(!LEVEL3_COD == "BOU") 
+tdwg_3 <-  st_read(dsn ="data/tdwg_3_realms_area/")  %>% 
+  filter(!LEVEL3_COD == "BOU") %>% 
+  rename(climate_zone = kcl_zone, realm = PhyloRealm) %>% 
+  st_transform(crs = "+proj=eqearth")
 
-
-# native species 
-dist_native <- fread("data/wcvp/dist_native.txt") 
-
-# accepted names 
-plants_full <- fread("data/wcvp/wcvp_accepted_merged.txt")
-
-
-# big genera list 
-big_genera <- read.csv("data/twenty_years_big.csv") 
-
-
-midpoints_red <- read.table("data/midpoints_coordinates.txt") %>% 
-  dplyr::select(LEVEL3_COD, lon, lat)
-
-sp_info <- plants_full %>% 
-  dplyr::select(plant_name_id, genus, family)
-
-data(vascular.families)
-
-angiosperms <- vascular.families %>% 
-  filter(Group == "angiosperms")
-
-
-# baseline richness ------------------------------------------------------------
-
-# calculating overall richness patterns 
-plants_big <- plants_full %>% 
-  filter(genus %in% big_genera$Genus) 
-
-# score big genera 
-dist_big <- dist_native %>% 
-  filter(plant_name_id %in% plants_big$plant_name_id) %>%  
-  mutate(big = "yes",
-         presence = 1)
-
-# score non-big genera
-dist_normal <- dist_native %>% 
-  filter(!plant_name_id %in% dist_big$plant_name_id) %>%  
-  mutate(big = "no", 
-         presence = -1)
-
-# combine dataset
-dist_full <- rbind(dist_big, dist_normal) %>%
-  left_join(sp_info, by = "plant_name_id")  %>% 
-  filter(family %in% angiosperms$Family)
-
-
-
-# calculate richness patterns 
-richness_patterns_bru <- dist_full %>% 
-  filter(!genus %in% c("Rubus", "Taraxacum", "Hieracium")) %>% 
-  group_by(area_code_l3) %>% 
-  summarise(
-    total_sp = n_distinct(plant_name_id),
-    big_sp = sum(presence > 0),
-    non_big_sp = sum(presence < 0),
-    prop_big = big_sp / total_sp
-  ) %>%
-  arrange(desc(total_sp)) %>% 
-  rename(LEVEL3_COD = area_code_l3)
-
-
-percont_stats <- richness_patterns_bru %>% 
-  left_join(tdwg_3, by = "LEVEL3_COD") %>% 
-  dplyr::select(-c(full_kcz, geometry)) %>% 
-  as.data.frame() 
+richness_patterns_bru <- fread("data/tdwg_overview_table_big_gen.csv")
 
 
 # Modelling --------------------------------------------------------------------
@@ -101,12 +36,12 @@ priors <- c(set_prior("normal(0.5, 0.5)", class = "Intercept"),
 )
 
 
-percont_stats$scaled_total_sp <- scale(percont_stats$total_sp)[,1]
+richness_patterns_bru$scaled_total_sp <- scale(richness_patterns_bru$total_sp)[,1]
 
 bayes_model <- brm(bf(prop_big ~ s(lat), 
              phi ~ s(lat),
              zi ~ 1),
-          data = percont_stats, 
+          data = richness_patterns_bru, 
           prior = priors, 
           cores = 4, seed = 17,
           family = zero_inflated_beta(),
@@ -158,13 +93,13 @@ effect_plot <- ggplot(bayes_extract_slopes, aes(x = draw, y = factor(lat), fill 
 
 # Smooth plot 
 
-preds <- percont_stats %>%
+preds <- richness_patterns_bru %>%
   add_epred_draws(bayes_model)
 
 
 
 bayes_gam <-
-  ggplot(data = percont_stats, aes(x = lat, y = prop_big)) +
+  ggplot(data = richness_patterns_bru, aes(x = lat, y = prop_big)) +
   stat_lineribbon(preds, mapping = aes(y = .epred), .width = c(.95, .8, .5),  col = "gold") +
   geom_point(aes(size = prop_big), alpha = 0.15, col = "#000c2f") +
   scale_fill_grey(start = 0.8, end = 0.4) +

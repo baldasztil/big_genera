@@ -11,78 +11,20 @@ normalize <- function(x, na.rm = TRUE) {
   return((x- min(x)) /(max(x)-min(x)))
 }
 
-
-tdwg_3 <-  st_read(dsn ="data/wgsrpd-master/tdwg_3_realms_area/")  %>% 
-  filter(!LEVEL3_COD == "BOU") %>% 
-  rename(climate_zone = kcl_zone, realm = PhyloRealm) %>% 
-  st_transform(crs = "+proj=eqearth")
+# data import ------------------------------------------------------------------
 
 
+tdwg_3 <-  st_read(dsn ="data/tdwg_3_realms_area/")  %>% 
+  st_transform(crs = "+proj=eqearth") %>% 
+  dplyr::select(geometry, LEVEL3_COD)
 
-dist_native <- fread("data/wcvp/dist_native.txt")  
-big_genera <- read.csv("data/twenty_years_big.csv")
-data("vascular.families")
-  
-angiosperms <- vascular.families %>% 
-  filter(Group == "angiosperms")
-
-plants_full <- fread("data/wcvp/wcvp_accepted_merged.txt") %>% 
-  filter(family %in% angiosperms$Family) 
-
-sp_info <- plants_full %>% 
-  dplyr::select(plant_name_id, genus, family)
-  
-
-# baseline richness ------------------------------------------------------------
-# calculating overall richness patterns 
-# calculating overall richness patterns 
-plants_big <- plants_full %>% 
-  filter(genus %in% big_genera$Genus) %>% 
-  filter(family %in% angiosperms$Family)# %>% 
-  #filter(!genus %in% c("Rubus", "Taraxacum", "Hieracium")) 
-
-
-# score big genera 
-dist_big <- dist_native %>% 
-  filter(plant_name_id %in% plants_big$plant_name_id) %>%  
-  mutate(big = "yes",
-         presence = 1)
-
-# score non-big genera
-dist_normal <- dist_native %>% 
-  filter(!plant_name_id %in% dist_big$plant_name_id) %>%  
-  mutate(big = "no", 
-         presence = -1)
-
-# combine dataset
-dist_full <- rbind(dist_big, dist_normal) %>%
-  left_join(sp_info, by = "plant_name_id")  %>% 
-  filter(family %in% angiosperms$Family) %>% 
- filter(!genus %in% c("Rubus", "Taraxacum", "Hieracium")) 
-  
-length(unique(dist_full$plant_name_id))
-
-
-
-# calculate richness patterns 
-richness_patterns_bru <- dist_full %>% 
-  group_by(area_code_l3) %>% 
-  summarise(
-    total_sp = n_distinct(plant_name_id),
-    big_sp = sum(presence > 0),
-    non_big_sp = sum(presence < 0),
-    prop_big = big_sp / total_sp
-  ) %>%
-  arrange(desc(total_sp)) %>% 
-  rename(LEVEL3_COD = area_code_l3)
+richness_patterns_bru <- fread("data/tdwg_overview_table_big_gen.csv")
 
 richness_mapping <- tdwg_3 %>% 
   left_join(richness_patterns_bru, by = "LEVEL3_COD")
 
 
-
 # Analysis ---------------------------------------------------------------------
-
 
 
 richness_mapping_long <- richness_mapping %>% 

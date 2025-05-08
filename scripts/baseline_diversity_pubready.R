@@ -15,13 +15,13 @@ wcvp_raw <- read.table("insert path here", sep="|", header=TRUE, quote = "", fil
 dist_raw <- read.table("insert path here", sep="|", header=TRUE, quote = "", fill=TRUE, encoding = "UTF-8") 
 
 # shapefile
-tdwg_3 <-  st_read(dsn ="data/wgsrpd-master/tdwg_3_realms_area/")  %>% 
+tdwg_3 <-  st_read(dsn ="data/tdwg_3_realms_area/")  %>% 
   filter(!LEVEL3_COD == "BOU") %>% 
   rename(climate_zone = kcl_zone, realm = PhyloRealm) %>% 
   st_transform(crs = "+proj=eqearth")
 
 # big genera list
-big_genera <- read.csv("data/twenty_years_big.csv")
+big_genera <- read.csv("data/twenty_years_big_extract.csv")
 
 # angiosperms
 data("vascular.families")
@@ -105,7 +105,7 @@ richness_patterns_bru <- dist_full %>%
 richness_mapping <- tdwg_3 %>% 
   left_join(richness_patterns_bru, by = "LEVEL3_COD")
 
-fwrite(richness_mapping %>% st_drop_geometry(), "tdwg_overview_table_big_gen.csv")
+fwrite(richness_mapping %>% st_drop_geometry(), "data/tdwg_overview_table_big_gen.csv")
 
 size_big_genus <- dist_big %>% 
   group_by(genus) %>% 
@@ -123,6 +123,6 @@ genus_matrix <- dist_big %>%
               names_from = realm) %>% 
   replace(is.na(.),0) 
 
-fwrite(genus_matrix, "big_genera_porportions_matrix.csv")
+fwrite(genus_matrix, "data/big_genera_porportions_matrix.csv")
 
 

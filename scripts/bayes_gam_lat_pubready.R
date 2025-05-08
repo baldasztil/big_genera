@@ -3,8 +3,6 @@ library(sf)
 library(cowplot)
 library(data.table)
 library(ggpubr)
-
-########### bayesian
 library(brms)
 library(tidybayes)
 library(rstanarm)
@@ -75,7 +73,7 @@ dist_full <- rbind(dist_big, dist_normal) %>%
 
 # calculate richness patterns 
 richness_patterns_bru <- dist_full %>% 
-  filter(!Genus %in% c("Rubus", "Taraxacum", "Hieracium")) %>% 
+  filter(!genus %in% c("Rubus", "Taraxacum", "Hieracium")) %>% 
   group_by(area_code_l3) %>% 
   summarise(
     total_sp = n_distinct(plant_name_id),
@@ -87,13 +85,13 @@ richness_patterns_bru <- dist_full %>%
   rename(LEVEL3_COD = area_code_l3)
 
 
-
 percont_stats <- richness_patterns_bru %>% 
   left_join(tdwg_3, by = "LEVEL3_COD") %>% 
   dplyr::select(-c(full_kcz, geometry)) %>% 
   as.data.frame() 
 
 
+# Modelling --------------------------------------------------------------------
 
 
 priors <- c(set_prior("normal(0.5, 0.5)", class = "Intercept"),
@@ -124,8 +122,10 @@ sd(abs(full_slopes$estimate))
 max(full_slopes$estimate)
 min(full_slopes$estimate)
 
-#mutate(across(where(is.numeric), ~ . * 100))
 
+# Plots ------------------------------------------------------------------------ 
+
+# Slopes and marginal effect 
 slopes_effect <- ggplot(full_slopes, aes(x = lat, y = estimate)) +
   geom_ribbon(full_slopes, mapping = aes(ymin = conf.low, ymax = conf.high), fill = "#cccccc",  alpha = 0.6) +
   geom_line(linewidth = 1.2, col = "red")+
@@ -156,6 +156,8 @@ effect_plot <- ggplot(bayes_extract_slopes, aes(x = draw, y = factor(lat), fill 
 
 
 
+# Smooth plot 
+
 preds <- percont_stats %>%
   add_epred_draws(bayes_model)
 
@@ -173,8 +175,7 @@ bayes_gam <-
 
 
 
-model_plot <- bayes_gam + slopes_effect + plot_annotation(tag_levels = "A")
+(model_plot <- bayes_gam + slopes_effect + plot_annotation(tag_levels = "A")) 
 
-ggsave("cry_in_Lines_marginaleffect_GAM_bayes_prop_big_latitude.png", model_plot, width = 12, height = 5, dpi = 600)
 
-model_plot
+
